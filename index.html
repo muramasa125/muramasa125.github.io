@@ -1,0 +1,343 @@
+<html>
+  <head>
+    <title>Othello-vue</title>
+    <link type="text/css" rel="stylesheet" href="https://unpkg.com/bootstrap/dist/css/bootstrap.min.css" />
+    <link type="text/css" rel="stylesheet" href="https://unpkg.com/bootstrap-vue@latest/dist/bootstrap-vue.min.css" />
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es2015%2CMutationObserver" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+    <script src="https://unpkg.com/bootstrap-vue@latest/dist/bootstrap-vue.min.js"></script>
+  </head>
+  <body>
+    <div id="app">
+      <b-navbar toggleable="sm" type="dark" variant="dark">
+        <b-navbar-brand href="#">Othello-vue</b-navbar-brand>
+        <b-navbar-toggle target="nav-collapse"></b-navbar-toggle>
+        <b-collapse id="nav-collapse" is-nav>
+          <b-navbar-nav>
+            <b-nav-item-dropdown :text="dispColor">
+              <b-dropdown-item href="#" v-on:click="changeColor(1)">Black</b-dropdown-item>
+              <b-dropdown-item href="#" v-on:click="changeColor(2)">White</b-dropdown-item>
+            </b-nav-item-dropdown>
+            <b-nav-item-dropdown v-bind:text="dispCOMLevel">
+                <b-dropdown-item href="#" v-on:click="changeCOMLevel(1)">1</b-dropdown-item>
+                <b-dropdown-item href="#" disabled>2</b-dropdown-item>
+                <b-dropdown-item href="#" disabled>3</b-dropdown-item>
+            </b-nav-item-dropdown>
+          </b-navbar-nav>
+        </b-collapse>
+      </b-navbar>
+      <b-container>
+        <div id="board" class="mx-auto">
+          <div v-for="(records, x) in board" :key="x" class="record">
+            <div v-for="(cell, y) in records" :key="y" class="cell" v-on:click="checkStone(x,y,true)" v-if="(x > 0 && x < 9) && (y > 0 && y < 9)">
+              <div v-if="cell === 1" class="black-stone"></div>
+              <div v-if="cell === 2" class="white-stone"></div>
+            </div>
+          </div>
+        </div>
+        <div class="info">
+          <div>{{ score }}</div>
+          <div class="message">{{ message }}</div>
+          <div>{{ timer }}</div>
+        </div>
+      </b-container>
+    </div>
+    <script>
+      var app = new Vue({
+        el: '#app',
+        data: {
+          board: [],
+          turn: 0,
+          message:'',
+          score: '',
+          color: 1,
+          comLevel: 1,
+          time: 0,
+          started: false,
+          putable: false
+        },
+        watch: {
+          'turn': function () {
+          }
+        },
+        computed: {
+          dispColor: function () {
+            return 'Color: ' + this.yourColor
+          },
+          yourColor: function () {
+            return this.color === 1 ? 'Black' : 'White'
+          },
+          nowColor: function () {
+            return this.turn === 1 ? 'Black' : 'White'
+          },
+          dispCOMLevel: function () {
+            return 'COMLevel: ' + this.comLevel
+          },
+          timer: function () {
+            this.time = 0
+          }
+        },
+        methods: {
+          changeColor: function (color) {
+            if (this.started) {
+              alert("Game is started. Can't change color")
+              return
+            }
+            this.color = color
+          },
+          changeCOMLevel: function (level) {
+            if (this.started) {
+              alert("Game is started. Can't change color")
+              return
+            }
+            this.comLevel = level
+          },
+          checkStone: function (x, y, flip) {
+            // すでに石がある場所はNG
+            if (this.board[x][y] != 0) {
+              return false
+            }
+            let reverse = 0
+            for(let i=-1; i<=1; i++) {
+              for(let j=-1; j<=1; j++) {
+                // 8方向に対して石が置けるか検査
+                if (i===0&&j===0) {continue} // 自分の場所はスキップ
+                let _x = x + i,_y = y + j,n=0
+                while(this.board[_x][_y] === 3 - this.turn) {n++;_x+=i;_y+=j} // 相手の色が続く間ループ
+                // 自分の色が相手を挟んでいればひっくり返せる
+                if (n>0 && this.board[_x][_y] === this.turn) {
+                  reverse += n
+                  // ひっくり返す
+                  if (flip) {
+                    let fx=x+i,fy=y+j
+                    while(this.board[fx][fy]===3-this.turn){
+                      this.board[fx].splice(fy,1,this.turn)
+                      fx += i
+                      fy += j
+                    }
+                  }
+                }
+              }
+            }
+            if (flip&&reverse) {
+              // ひっくり返しが成功したら石を置く
+              this.board[x].splice(y,1,this.turn)
+              this.changeTurn()
+              // COM動作
+              if (this.turn === this.color) {
+                this.message += '\nyour turn'
+              } else {
+                _this = this
+                setTimeout(
+                  function () {
+                    _this.flipCOM()
+                  },
+                  1000
+                )
+              }
+              // 配列更新のイベント強制発火
+              this.board.splice()
+              this.started =true
+            }
+            return reverse
+          },
+          checkFlip: function () {
+            for(let i=1; i<9; i++) {
+              for(let j=1; j<9; j++) {
+                if (this.checkStone(i,j,false)) {
+                  return true
+                }
+              }
+            }
+            return false
+          },
+          changeTurn: function () {
+            this.turn = 3 - this.turn
+            // パスチェック
+            if (this.checkFlip()) {
+              this.message = this.nowColor + "'s turn"
+              return
+            }
+            let passColor = this.nowColor
+            this.turn = 3 - this.turn
+            // パスチェック２回目
+            if (this.checkFlip()) {
+              this.message = passColor + ' pass '
+              this.message += this.nowColor + "'s turn"
+              return
+            }
+            // 勝敗判定
+            let b=0,w=0
+            this.board.forEach(record => {
+              record.forEach(cell => {
+                if (cell === 1) {b++}
+                if (cell === 2) {w++}
+              })
+            })
+            this.score = 'Black: ' + b +  ' White: ' + w 
+            if (b===w) {
+              this.message = "DROW"
+              return
+            }
+            this.message = (b > w ? 'Black':'White') + ' won'
+          },
+          creatBoard: function () {
+            // 盤面作成（10*10）
+            for(let i=0; i<10; i++) {
+              this.board[i] = []
+              for(let j=0; j<10; j++) {
+                this.board[i].splice(j,1,0)
+              }
+            }
+            // 初期配置
+            this.board[4][5] = 1
+            this.board[5][4] = 1
+            this.board[4][4] = 2
+            this.board[5][5] = 2            
+          },
+          flipCOM: function () {
+            let r = this.checkCOMFlip()
+            if (r) {
+              this.checkStone(r['x'],r['y'],true)
+            }
+          },
+          checkCOMFlip: function () {
+            // 配置可能な石の状態を取得
+            let results = []
+            for(let i=1; i<9; i++) {
+              for(let j=1; j<9; j++) {
+                let result = this.checkStone(i,j,false)
+                if (result) {
+                  results.push({ 'x': i, 'y': j, 'stone': result})
+                }
+              }
+            }
+            let min = {'stone':0}
+            let stack = []
+            results.forEach(r => {              
+              if (min['stone'] === 0 || (r['stone'] < min['stone'])) { min = r }
+              boardWeight.forEach(w => {
+                if (r['x'] === w['x'] && r['y'] === w['y']) {
+                  r['weight'] = w['weight']
+                  stack.push(_r)
+                  return
+                }
+              })
+            })
+            if (this.comLevel === 1) { return min }
+            if (this.comLevel === 2) {
+              
+            }
+          }
+        },
+        created: function () {
+          this.creatBoard()
+          this.turn = 2 // とりあえずの白
+          this.changeTurn() 
+        }
+      })
+      // global const
+      const boardWeight = [
+        {'x': 1, 'y': 1, 'weight': 2 },
+        {'x': 1, 'y': 2, 'weight': 4 },
+        {'x': 1, 'y': 3, 'weight': 3 },
+        {'x': 1, 'y': 4, 'weight': 3 },
+        {'x': 1, 'y': 5, 'weight': 3 },
+        {'x': 1, 'y': 6, 'weight': 3 },
+        {'x': 1, 'y': 7, 'weight': 4 },
+        {'x': 1, 'y': 8, 'weight': 2 },
+        {'x': 2, 'y': 1, 'weight': 4 },
+        {'x': 2, 'y': 2, 'weight': 4 },
+        {'x': 2, 'y': 3, 'weight': 3 },
+        {'x': 2, 'y': 4, 'weight': 3 },
+        {'x': 2, 'y': 5, 'weight': 3 },
+        {'x': 2, 'y': 6, 'weight': 3 },
+        {'x': 2, 'y': 7, 'weight': 4 },
+        {'x': 2, 'y': 8, 'weight': 4 },
+        {'x': 3, 'y': 1, 'weight': 3 },
+        {'x': 3, 'y': 2, 'weight': 3 },
+        {'x': 3, 'y': 3, 'weight': 1 },
+        {'x': 3, 'y': 4, 'weight': 1 },
+        {'x': 3, 'y': 5, 'weight': 1 },
+        {'x': 3, 'y': 6, 'weight': 1 },
+        {'x': 3, 'y': 7, 'weight': 3 },
+        {'x': 3, 'y': 8, 'weight': 3 },
+        {'x': 4, 'y': 1, 'weight': 3 },
+        {'x': 4, 'y': 2, 'weight': 3 },
+        {'x': 4, 'y': 3, 'weight': 1 },
+        {'x': 4, 'y': 4, 'weight': 1 },
+        {'x': 4, 'y': 5, 'weight': 1 },
+        {'x': 4, 'y': 6, 'weight': 1 },
+        {'x': 4, 'y': 7, 'weight': 3 },
+        {'x': 4, 'y': 8, 'weight': 3 },
+        {'x': 5, 'y': 1, 'weight': 3 },
+        {'x': 5, 'y': 2, 'weight': 3 },
+        {'x': 5, 'y': 3, 'weight': 1 },
+        {'x': 5, 'y': 4, 'weight': 1 },
+        {'x': 5, 'y': 5, 'weight': 1 },
+        {'x': 5, 'y': 6, 'weight': 1 },
+        {'x': 5, 'y': 7, 'weight': 3 },
+        {'x': 5, 'y': 8, 'weight': 3 },
+        {'x': 6, 'y': 1, 'weight': 3 },
+        {'x': 6, 'y': 2, 'weight': 3 },
+        {'x': 6, 'y': 3, 'weight': 1 },
+        {'x': 6, 'y': 4, 'weight': 1 },
+        {'x': 6, 'y': 5, 'weight': 1 },
+        {'x': 6, 'y': 6, 'weight': 1 },
+        {'x': 6, 'y': 7, 'weight': 3 },
+        {'x': 6, 'y': 8, 'weight': 3 },
+        {'x': 7, 'y': 1, 'weight': 4 },
+        {'x': 7, 'y': 2, 'weight': 4 },
+        {'x': 7, 'y': 3, 'weight': 3 },
+        {'x': 7, 'y': 4, 'weight': 3 },
+        {'x': 7, 'y': 5, 'weight': 3 },
+        {'x': 7, 'y': 6, 'weight': 3 },
+        {'x': 7, 'y': 7, 'weight': 4 },
+        {'x': 7, 'y': 8, 'weight': 4 },
+        {'x': 8, 'y': 1, 'weight': 2 },
+        {'x': 8, 'y': 2, 'weight': 4 },
+        {'x': 8, 'y': 3, 'weight': 3 },
+        {'x': 8, 'y': 4, 'weight': 3 },
+        {'x': 8, 'y': 5, 'weight': 3 },
+        {'x': 8, 'y': 6, 'weight': 3 },
+        {'x': 8, 'y': 7, 'weight': 4 },
+        {'x': 8, 'y': 8, 'weight': 2 }
+      ]
+    </script>
+  </body>
+  <style>
+    .record {
+      float: left;
+    }
+    .cell {
+      cursor: pointer;
+      clear: both;
+      border: 1px solid black;
+      width: 3rem;
+      height: 3rem;
+      background-color: #00ee00;
+    }
+    .cell:hover {
+      background-color: aqua;
+    }
+    .black-stone {
+      width: 2.9rem;
+      height: 2.9rem;
+      background-color: black;
+      border-radius: 50%;
+    }
+    .white-stone {
+      width: 2.9rem;
+      height: 2.9rem;
+      background-color: white;
+      border-radius: 50%;
+    }
+    .info {
+      clear: both;
+    }
+    .message {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+  </style>
+</html>
