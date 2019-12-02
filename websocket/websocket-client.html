@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="jp">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Websocket-sample</title>
+  <!-- Load required Bootstrap and BootstrapVue CSS -->
+  <link type="text/css" rel="stylesheet" href="https://unpkg.com/bootstrap/dist/css/bootstrap.min.css" />
+  <link type="text/css" rel="stylesheet" href="https://unpkg.com/bootstrap-vue@latest/dist/bootstrap-vue.min.css" />
+
+  <!-- Load polyfills to support older browsers -->
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es2015%2CIntersectionObserver" crossorigin="anonymous"></script>
+  
+  <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+  <!-- Load Vue followed by BootstrapVue -->
+  <script src="https://unpkg.com/vue@latest/dist/vue.min.js"></script>
+  <script src="https://unpkg.com/bootstrap-vue@latest/dist/bootstrap-vue.min.js"></script>
+</head>
+<body>
+  <div id="app">
+    <b-navbar toggleable="lg" type="dark" variant="info">
+      <b-navbar-brand href="#">Websocket-sample</b-navbar-brand>
+    </b-navbar>
+    <b-container class="mt-2">
+      <b-form>
+        <b-form-input v-model="text" placeholder="何か適当にメッセージ入力"></b-form-input>
+        <b-button variant="success" v-on:click="sendMessage">Websocket Send!!</b-button>
+      </b-form>
+      <b-list-group>
+      <b-list-group-item v-for="message in messages">
+        {{ message }}
+      </b-list-group-item>
+      </b-list-group>
+    </b-container>
+  </div>
+  <script>
+  var websocket = new WebSocket('ws://127.0.0.1:60000') // localhostのwebsocket-serverに接続
+  var app = new Vue({
+    el: '#app',
+    data: {
+      text: '',
+      messages: [],
+      web_socket: null
+    },
+    mounted: function () {
+      const self = this
+      
+      websocket.onopen = function(event) {
+        console.log('websocket connection open...')
+      }
+
+      websocket.onmessage = function(event) {
+        console.log('websocket onmessage')
+
+        if(event && event.data) {
+          self.pushMessage(event.data)
+        }
+      },
+      websocket.onerror = function(event) {
+        console.log('websocket connection error...')
+        console.log(event)
+      },
+      websocket.onclose = function(event) {
+        console.log('websocket connection close...')
+        console.log(event)
+      }
+    },
+    methods: {
+      sendMessage: function () {
+        if (this.text === '') {
+          return false
+        }
+        websocket.send(this.text)
+        this.text = ''
+      },
+      pushMessage: function (message) {
+        this.messages.push(message)
+      }
+    }
+  })
+  </script>
+</body>
+</html>
